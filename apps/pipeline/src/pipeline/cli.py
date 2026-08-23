@@ -5,6 +5,7 @@ import argparse
 from pipeline.adapters.git_vault import GitVault
 from pipeline.config import Config
 from pipeline.domain.identity import CaptureId
+from pipeline.domain.vault import Vault
 
 
 def main() -> None:
@@ -16,7 +17,9 @@ def main() -> None:
 
     arguments = parser.parse_args()
     config = Config.from_environment()
-    vault = GitVault.clone(config.vault_remote, config.working_copy)
+    # Annotated against the port, so mypy verifies the adapter still implements
+    # it. Structural typing alone would let the two drift apart unnoticed.
+    vault: Vault = GitVault.clone(config.vault_remote, config.working_copy)
 
     if arguments.command == "list":
         for capture in vault.captures():
