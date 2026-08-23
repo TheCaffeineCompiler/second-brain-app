@@ -11,6 +11,8 @@ than trusts, and why a run against a small local model will surface `Malformed`
 where a larger one does not.
 """
 
+from urllib.parse import urlparse
+
 from openai import OpenAI
 from openai.types.chat import ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
 from openai.types.shared_params import ResponseFormatJSONSchema
@@ -35,9 +37,11 @@ class OpenAICompatibleLanguageModel:
     ) -> None:
         self._client = client or OpenAI(base_url=base_url)
         self._model = model
-        # Part of the version: the same model served by two endpoints can behave
-        # differently, and a local endpoint is not the hosted one.
-        self._endpoint = base_url or "openai"
+        # Host only — no scheme, port or path. A local endpoint is genuinely not
+        # the hosted one, so the host belongs in the version; the port does not.
+        # Including it meant a restart on a different port re-derived the whole
+        # corpus, and wrote local network details into every Note in Git.
+        self._endpoint = (urlparse(base_url).hostname or "openai") if base_url else "openai"
 
     @property
     def version(self) -> str:

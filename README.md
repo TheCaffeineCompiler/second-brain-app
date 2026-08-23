@@ -132,8 +132,22 @@ same protocol, no network, no auth.
 docker compose up --build          # seeds .vault-remote/vault.git from fixtures/vault
 ```
 
-Configuration lives in a single committed `.env` at the project root, read by both docker
-compose and the host CLI, so there is nothing to export:
+Configuration lives in a committed `.env` at the project root, read by both docker compose
+and the host CLI, so there is nothing to export. **Secrets and machine-specific choices go
+in `.env.local`**, which is gitignored and overrides `.env`:
+
+```bash
+cat > .env.local <<'ENV'
+LLM_PROVIDER=openai
+LLM_MODEL=llama3.1
+LLM_BASE_URL=http://localhost:11434/v1
+OPENAI_API_KEY=...
+ENV
+```
+
+A test asserts `.env` holds nothing that looks like a secret, because a key put in the
+wrong file is published to everyone who clones the repo and the file cannot tell you so.
+
 
 ```bash
 docker compose run --rm pipeline list      # in the container

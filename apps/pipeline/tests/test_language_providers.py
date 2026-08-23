@@ -152,3 +152,45 @@ def test_the_openai_provider_insists_on_a_model(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     with pytest.raises(UnknownProvider, match="LLM_MODEL"):
         from_environment("openai")
+
+
+def test_the_endpoint_port_does_not_change_the_version() -> None:
+    """A local server restarting on a different port must not re-derive the corpus."""
+    from openai import OpenAI
+
+    from pipeline.adapters.openai_compatible import OpenAICompatibleLanguageModel
+
+    def at(port: int) -> str:
+        url = f"http://127.0.0.1:{port}/v1"
+        return OpenAICompatibleLanguageModel(
+            model="gemma", base_url=url, client=OpenAI(base_url=url, api_key="x")
+        ).version
+
+    assert at(1234) == at(1235)
+
+
+def test_a_local_endpoint_is_still_distinct_from_a_hosted_one() -> None:
+    """Same model name, different host, genuinely different output."""
+    from openai import OpenAI
+
+    from pipeline.adapters.openai_compatible import OpenAICompatibleLanguageModel
+
+    def at(url: str) -> str:
+        return OpenAICompatibleLanguageModel(
+            model="llama3.1", base_url=url, client=OpenAI(base_url=url, api_key="x")
+        ).version
+
+    assert at("http://localhost:11434/v1") != at("https://openrouter.ai/api/v1")
+
+
+def test_no_note_records_a_port_number() -> None:
+    """The version is written into every Note and committed to Git forever."""
+    from openai import OpenAI
+
+    from pipeline.adapters.openai_compatible import OpenAICompatibleLanguageModel
+
+    url = "http://127.0.0.1:1234/v1"
+    version = OpenAICompatibleLanguageModel(
+        model="gemma", base_url=url, client=OpenAI(base_url=url, api_key="x")
+    ).version
+    assert "1234" not in version and "://" not in version
