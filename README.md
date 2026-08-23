@@ -5,9 +5,10 @@ podcasts, blogposts and meetings — and an agentic pipeline turns them into a s
 linked, searchable knowledge base. Everything is markdown in a Git repository, so the knowledge
 outlives the app.
 
-> **Status: design.** No code yet. This repository currently holds the domain model, the
-> architectural decisions behind it, and the implementation plan. Start with
-> **[docs/design-overview.pdf](docs/design-overview.pdf)** — two pages covering the whole system.
+> **Status: the spine runs.** A Capture in a Git Vault is enriched into a Note and committed
+> back, locally or in CI. Contributions and Topics are not built yet. Start with
+> **[docs/design-overview.pdf](docs/design-overview.pdf)** — two pages covering the whole system —
+> then **[docs/tutorials/enrichment.md](docs/tutorials/enrichment.md)** to run it yourself.
 
 ## The organising idea
 
@@ -30,6 +31,9 @@ artifact. Almost every rule in the system follows from that split.
 | **Candidate** | An entity the pipeline noticed that you haven't admitted yet | derived | — |
 
 Full definitions and relationships are in **[CONTEXT.md](CONTEXT.md)**.
+
+Captures, Notes and the Registry exist in code today. Contributions, Topics, Sources and
+Candidates are designed but not yet built.
 
 ## How it works
 
@@ -64,10 +68,21 @@ captured that day, never with the size of the corpus.
 ```
 CONTEXT.md                  Domain glossary and relationships
 README.md                   You are here
+.env                        Committed configuration, read by both compose and the host CLI
+docker-compose.yml          The whole stack, offline
+apps/pipeline/
+  src/pipeline/
+    domain/                 Captures, Notes, enrichment, drift — no I/O, no SDKs
+    adapters/               Git, GitHub, markdown, and one module per model provider
+    cli.py                  init, enrich, list, show
+  tests/                    78 tests, including executable architecture invariants
+fixtures/vault/             The seed Vault the local stack clones from
+scripts/quality_summary.py  Renders the CI quality page
 docs/
   design-overview.pdf       Two-page overview of the whole design
   design-overview.html      Source for the above; regenerated as decisions land
-  adr/                      22 architectural decisions, each with its rejected alternatives
+  adr/                      24 architectural decisions, each with its rejected alternatives
+  tutorials/enrichment.md   Run the pipeline end to end in five steps
   requirements/
     requirements.v000.md    The original PRD
     slice-1.md              Scope and definition of done for the tracer bullet
@@ -88,14 +103,14 @@ The MVP has no app. Obsidian is the entire interface, and the review loops are j
 move a line between — so the first release is a pipeline and nothing else, because that is
 where all the risk lives ([ADR-0018](docs/adr/0018-the-mvp-has-no-app.md)).
 
-| # | Slice | Proves |
-|---|---|---|
-| 1 | Capture in Git → Cloud Run Job → Note committed back | The whole spine, end to end |
-| 2 | Contributions → Topics, gated by a hand-written Registry | Whether Topic pages are worth reading |
-| 3 | `candidates.md` / `items.md` review loops | Whether promotion friction is tolerable |
-| 4 | Desktop hotkey and local Whisper, Registry-biased | Capture ergonomics |
-| 5 | Mobile share-target capture | Provenance at its cheapest moment |
-| 6 | PWA and client-side index | Only once Obsidian stops sufficing |
+| # | Slice | Proves | Status |
+|---|---|---|---|
+| 1 | Capture in Git → enrichment → Note committed back | The whole spine, end to end | Runs locally and in CI; not yet deployed as a scheduled job |
+| 2 | Contributions → Topics, gated by a hand-written Registry | Whether Topic pages are worth reading | Next |
+| 3 | `candidates.md` / `items.md` review loops | Whether promotion friction is tolerable | |
+| 4 | Desktop hotkey and local Whisper, Registry-biased | Capture ergonomics | |
+| 5 | Mobile share-target capture | Provenance at its cheapest moment | |
+| 6 | PWA and client-side index | Only once Obsidian stops sufficing | |
 
 Slices 1–3 are a decision point, not a milestone. If derived Topics turn out not to be useful,
 the answer is to fix enrichment rather than proceed — and having built no app is what keeps
@@ -122,6 +137,27 @@ reaches Cloud Run is able to create or delete a repository.
 > **Branch protection needs GitHub Pro on private repositories.** Without it, `init` warns
 > that force-push is not blocked and continues. The code carries its own guard — no module
 > may pass `--force` to git, asserted as an executable invariant.
+
+## Running the pipeline
+
+```bash
+pipeline enrich          # derive a Note for every Capture that needs one, and commit them
+pipeline list            # every Capture in the Vault
+pipeline show <id>       # one Capture
+```
+
+`enrich` is idempotent. It reads every Capture, skips the ones whose Note is already current,
+and commits the rest in a single commit under its own identity. Three things make a Note need
+deriving again: the Capture changed, the pipeline version changed, or the Note is missing.
+Nothing about it depends on a timestamp, so a replay of the whole corpus produces the same
+result as the runs that built it incrementally.
+
+If you hand-edit a Note, the pipeline notices — the content hash no longer matches — and
+refuses to overwrite it rather than silently discarding your edit. Notes are derived; the
+place to record a thought about one is a new Capture ([ADR-0003](docs/adr/0003-notes-are-read-only-with-drift-detection.md)).
+
+[docs/tutorials/enrichment.md](docs/tutorials/enrichment.md) walks the whole thing through in
+five steps; the first four need no API key.
 
 ## Local development
 
@@ -187,11 +223,30 @@ Vault under your name.
 
 The provider is part of the pipeline version, so switching re-derives the corpus.
 
+## Quality
+
+Every push runs the gates in [ADR-0019](docs/adr/0019-the-quality-harness.md): ruff, `ruff
+format --check`, mypy in strict mode, and the test suite with coverage. CI renders a **quality
+page** into the job summary, grouping tests by what they guard rather than by file, so a
+failure says which property broke.
+
+Some of the tests are architecture invariants, asserted against the AST rather than by
+convention — the domain never touches the filesystem, never imports an adapter, and never
+imports a provider SDK; no adapter imports more than one provider SDK; no module passes
+`--force` to git; `.env` holds nothing resembling a secret and `.env.local` is untracked.
+Each has been mutation-checked, because an invariant that cannot fail is decoration.
+
+There is also an end-to-end test that runs the real stack — compose seeds a Vault, the
+container reads it, and the host CLI reads the same Vault with nothing exported. It exists
+because that last case broke once and was invisible to every unit test.
+
 ## Stack
 
 Markdown in Git, in Google's [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md).
-Pipeline as a Cloud Run Job on GCP. Ports and adapters throughout, with the domain owning the
-frontmatter contract and adapters owning the files.
+Python 3.12 in a `uv` workspace. Ports and adapters throughout, with the domain owning the
+frontmatter contract and adapters owning the files ([ADR-0016](docs/adr/0016-the-domain-owns-frontmatter-the-adapter-owns-the-file.md)).
+The pipeline is designed to run as a Cloud Run Job on GCP ([ADR-0013](docs/adr/0013-compute-is-split-by-workload.md));
+that deployment is not built yet.
 
 ## Reading the decisions
 
