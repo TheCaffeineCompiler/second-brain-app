@@ -149,6 +149,30 @@ so deployment sets no file at all.
 against it. Re-running `docker compose up` never re-seeds an existing Vault; initialization is
 not destructive (ADR-0023).
 
+## Choosing a language model
+
+Enrichment is not tied to one vendor (ADR-0024). Set the provider through the
+environment:
+
+```bash
+export LLM_PROVIDER=anthropic                      # the default
+export ANTHROPIC_API_KEY=sk-ant-...
+
+export LLM_PROVIDER=openai                         # any OpenAI-compatible endpoint
+export LLM_MODEL=llama3.1                          # Ollama, locally
+export LLM_BASE_URL=http://localhost:11434/v1
+
+pipeline enrich --provider stub                    # offline and deterministic
+```
+
+Both providers are sent the same prompt and the same JSON schema, so a switch
+changes who answers rather than what was asked. Schema adherence varies a great
+deal between models — a reply that ignores the schema fails loudly rather than
+being repaired, because patching one silently would put invented content into the
+Vault under your name.
+
+The provider is part of the pipeline version, so switching re-derives the corpus.
+
 ## Stack
 
 Markdown in Git, in Google's [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md).

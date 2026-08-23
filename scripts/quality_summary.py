@@ -23,6 +23,7 @@ AREAS = {
     "test_invariants": "Invariants — rules the ADRs make mechanically checkable",
     "test_enrichment": "Enrichment — staleness is a hash, drift is refused (ADR-0003)",
     "test_run": "Enrichment runs — incremental, and never overwrites your edits (ADR-0010)",
+    "test_language_providers": "Providers — the model is configuration, not architecture (ADR-0024)",
 }
 PASS, FAIL = "✅", "❌"
 

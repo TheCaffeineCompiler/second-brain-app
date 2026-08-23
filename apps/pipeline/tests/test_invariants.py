@@ -10,6 +10,7 @@ from pathlib import Path
 SOURCE = Path(__file__).resolve().parents[1] / "src" / "pipeline"
 FORCE = ("--force", "--force-with-lease", "--mirror")
 FILESYSTEM = {"pathlib", "os", "shutil", "subprocess", "io", "glob", "tempfile"}
+PROVIDER_SDKS = {"anthropic", "openai", "google", "cohere", "mistralai", "ollama", "litellm"}
 
 
 def modules(under: Path = SOURCE) -> list[Path]:
@@ -55,3 +56,21 @@ def test_the_domain_never_imports_an_adapter() -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:
                 assert "adapters" not in node.module, f"{module.name} imports {node.module}"
+
+
+def test_the_domain_never_imports_a_provider() -> None:
+    """Which model runs enrichment is configuration, not architecture.
+
+    The LanguageModel port is only worth having if nothing behind it knows who
+    answered — otherwise switching provider becomes a domain change.
+    """
+    for module in modules(SOURCE / "domain"):
+        offending = imports(module) & PROVIDER_SDKS
+        assert not offending, f"domain module {module.name} imports {sorted(offending)}"
+
+
+def test_no_adapter_imports_another_providers_sdk() -> None:
+    """Choosing one provider must not require the others to be installed."""
+    for module in modules(SOURCE / "adapters"):
+        used = imports(module) & PROVIDER_SDKS
+        assert len(used) <= 1, f"{module.name} pulls in several provider SDKs: {sorted(used)}"

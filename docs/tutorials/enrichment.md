@@ -21,7 +21,7 @@ and produces the same output every time.
 
 ```bash
 cd apps/pipeline
-uv run pipeline enrich --model stub
+uv run pipeline enrich --provider stub
 ```
 
 ```
@@ -57,7 +57,7 @@ two fields are what steps 3 and 4 test.
 ## 3. Prove the run is incremental
 
 ```bash
-uv run pipeline enrich --model stub
+uv run pipeline enrich --provider stub
 ```
 
 ```
@@ -77,7 +77,7 @@ Now change a Capture and watch exactly one Note regenerate:
 ```bash
 echo "Correction: the audit is in October, not November." \
   >> ../../.working-copy/vault/captures/2026-08-23T1714.md
-uv run pipeline enrich --model stub     # → 1 derived, 1 unchanged
+uv run pipeline enrich --provider stub     # → 1 derived, 1 unchanged
 ```
 
 ## 4. Prove the pipeline refuses to overwrite your edits
@@ -87,7 +87,7 @@ Obsidian prevents:
 
 ```bash
 echo "A sentence I added myself." >> ../../.working-copy/vault/notes/2026-08-23T1714.md
-uv run pipeline enrich --model stub
+uv run pipeline enrich --provider stub
 ```
 
 ```
@@ -105,14 +105,27 @@ git -C ../../.working-copy/vault log --format='%an: %s' -3   # your edit was NOT
 The pipeline detected the drift, refused to overwrite, reported it, and **did not
 commit your text under its own identity**. It stages only the files it wrote.
 
-## 5. Run it against the real model
+## 5. Run it against a real model
 
-This is the step I could not verify — it needs credentials.
+This is the step I could not verify — it needs credentials or a local server.
+
+**Anthropic** (the default provider):
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...     # or run `ant auth login`
-uv run pipeline enrich                  # --model claude is the default
+uv run pipeline enrich
 ```
+
+**Locally, with Ollama** — nothing leaves your machine:
+
+```bash
+ollama serve && ollama pull llama3.1
+export LLM_PROVIDER=openai LLM_MODEL=llama3.1 LLM_BASE_URL=http://localhost:11434/v1
+uv run pipeline enrich
+```
+
+**Any other OpenAI-compatible endpoint** — OpenRouter, Together, vLLM, OpenAI —
+is the same three variables with a different `LLM_BASE_URL`.
 
 Force a full re-derivation first, so there is work to do:
 
@@ -140,19 +153,26 @@ cat ../../.working-copy/vault/notes/*.md
 If the answers are no, the fix is the prompt in `apps/pipeline/src/pipeline/adapters/claude.py`
 — not more scaffolding around it.
 
+Expect a small local model to be noticeably worse here, and to fail with `Malformed`
+where a frontier model succeeds — many endpoints accept a JSON schema and then ignore
+it. That failure is deliberate: repairing a bad reply would put invented or truncated
+content into the Vault under your name.
+
 ### Effort and cost
 
-Effort defaults to `low`. Claude Opus 5 performs unusually well there and this is a
-cleanup task rather than a reasoning one, so `low` is the starting point rather than a
-compromise. Try raising it and see whether the output actually improves:
+On Anthropic, effort defaults to `low`. Opus 5 performs unusually well there and this
+is a cleanup task rather than a reasoning one, so `low` is a starting point rather than
+a compromise. Try raising it and see whether the output actually improves:
 
 ```bash
-uv run pipeline enrich --effort medium
+ANTHROPIC_EFFORT=medium uv run pipeline enrich
 ```
 
-Changing `--effort` changes the pipeline version, so **every Note is re-derived**. That
-is correct — effort changes the output, so it is part of what produced it — but it means
-an effort sweep costs a full pass each time.
+### Anything that changes the output re-derives the corpus
+
+The pipeline version covers the provider, the model, the effort level and a hash of the
+prompt. Change any of them and **every Note is re-derived** — correct, because the Notes
+really did change, but it means a sweep costs a full pass each time.
 
 ## Troubleshooting
 
@@ -160,5 +180,7 @@ an effort sweep costs a full pass each time.
 |---|---|
 | `VAULT_REMOTE is not set` | Run from inside the repo, after `docker compose up` — config comes from `.env` |
 | `git pull --rebase failed` | Should not happen: a dirty working copy is expected and the pull is skipped. If it does, the working copy has a conflict — resolve it in the Vault |
-| Everything re-derives unexpectedly | The pipeline version changed. It includes the model, the effort level, and a hash of the prompt — editing any of them invalidates the corpus by design |
+| Everything re-derives unexpectedly | The pipeline version changed. It covers the provider, model, effort and a hash of the prompt — editing any of them invalidates the corpus by design |
+| `Malformed` | The model ignored the JSON schema. Common on small local models; try a larger one rather than loosening the validator |
+| `LLM_MODEL is required` | The `openai` provider has no default model — OpenAI, OpenRouter and Ollama share no sensible one |
 | `Refused` | Claude's safety classifiers declined the Capture. Returns HTTP 200, not an error, which is why the adapter checks `stop_reason` before reading content |
