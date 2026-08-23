@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -58,3 +59,21 @@ def test_seeding_leaves_a_single_commit(vault_remote: Seed, tmp_path: Path) -> N
         check=True,
     ).stdout.strip()
     assert count == "2", "seed commit plus the fixture's own initial commit"
+
+
+def test_commits_without_any_ambient_git_identity(vault_remote: Seed, tmp_path: Path) -> None:
+    """A Cloud Run Job has no git config, and neither does CI. The pipeline must
+    carry its own identity rather than borrow the machine's.
+    """
+    vault = GitVault.clone(vault_remote({}), tmp_path / "work")
+    provisioning.initialise(vault)
+
+    author = subprocess.run(
+        ["git", "log", "-1", "--format=%an <%ae>"],
+        cwd=tmp_path / "work",
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"},
+    ).stdout.strip()
+    assert author == "Second Brain pipeline <pipeline@second-brain.local>"

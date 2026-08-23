@@ -15,6 +15,12 @@ from pipeline.domain.vault import Artifact
 
 CAPTURES = "captures"
 
+# The pipeline is a distinct writer from the user (ADR-0011), so it commits under
+# its own identity. Passed explicitly rather than read from git config: a Cloud Run
+# Job has no ambient identity, and depending on the machine's would make commit
+# authorship vary with where the pipeline happened to run.
+AUTHOR = ("Second Brain pipeline", "pipeline@second-brain.local")
+
 # The adapter owns paths; the domain names artifacts (ADR-0016).
 PATHS = {
     "registry": "registry.md",
@@ -80,7 +86,18 @@ class GitVault:
         _git(self._root, "add", "-A")
         if not _git_output(self._root, "status", "--porcelain"):
             return False
-        _git(self._root, "commit", "--quiet", "-m", message)
+        name, email = AUTHOR
+        _git(
+            self._root,
+            "-c",
+            f"user.name={name}",
+            "-c",
+            f"user.email={email}",
+            "commit",
+            "--quiet",
+            "-m",
+            message,
+        )
         _git(self._root, "push", "--quiet", "origin", "HEAD")
         return True
 

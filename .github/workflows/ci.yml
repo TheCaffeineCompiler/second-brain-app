@@ -46,16 +46,28 @@ jobs:
           TESTS: ${{ steps.tests.outcome }}
         run: uv run python ../../scripts/quality_summary.py . >> "$GITHUB_STEP_SUMMARY"
 
+      # continue-on-error masks each step's conclusion, so the run page shows them
+      # all as green. Name the failures explicitly here, and read the job summary
+      # for which tests broke.
       - name: Fail if any gate failed
         if: always()
         env:
-          OUTCOMES: >-
-            ${{ steps.lint.outcome }} ${{ steps.format.outcome }}
-            ${{ steps.types.outcome }} ${{ steps.tests.outcome }}
+          GATES: >-
+            lint:${{ steps.lint.outcome }} format:${{ steps.format.outcome }}
+            types:${{ steps.types.outcome }} tests:${{ steps.tests.outcome }}
         run: |
-          for outcome in $OUTCOMES; do
-            [ "$outcome" = success ] || exit 1
+          failed=""
+          for gate in $GATES; do
+            case "$gate" in
+              *:success) ;;
+              *) failed="$failed ${gate%%:*}" ;;
+            esac
           done
+          if [ -n "$failed" ]; then
+            echo "::error::failing gates:$failed — see the Quality summary on this run"
+            exit 1
+          fi
+          echo "all gates passed"
 
   stack:
     runs-on: ubuntu-latest
