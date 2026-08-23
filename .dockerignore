@@ -1,0 +1,7 @@
+.git
+.working-copy
+**/.venv
+**/__pycache__
+**/tests
+docs
+fixtures

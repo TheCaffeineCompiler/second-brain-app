@@ -11,7 +11,9 @@ services:
     entrypoint: ["sh", "/seed-vault.sh"]
 
   pipeline:
-    build: ./apps/pipeline
+    build:
+      context: .
+      dockerfile: apps/pipeline/Dockerfile
     depends_on:
       vault:
         condition: service_completed_successfully
