@@ -5,7 +5,7 @@
 * { box-sizing: border-box; }
 html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body {
-  font: 8.6pt/1.42 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font: 8.35pt/1.37 "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: #16181d; margin: 0;
 }
 h1 { font-size: 17pt; letter-spacing: -.35pt; margin: 0 0 1pt; font-weight: 700; }
@@ -14,8 +14,8 @@ h1 { font-size: 17pt; letter-spacing: -.35pt; margin: 0 0 1pt; font-weight: 700;
 
 section.brk { break-inside: auto; }
 ol.d li, ul.i li, ul.q li { break-inside: avoid; }
-section { display: grid; grid-template-columns: 26mm 1fr; gap: 0 6mm;
-          padding: 7pt 0 0; border-top: .4pt solid #d6d9de; margin-top: 7pt; break-inside: avoid; }
+section { display: grid; grid-template-columns: 24mm 1fr; gap: 0 5mm;
+          padding: 6pt 0 0; border-top: .4pt solid #d6d9de; margin-top: 7pt; break-inside: avoid; }
 section:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
 .lbl { font-size: 7pt; font-weight: 700; letter-spacing: .7pt; text-transform: uppercase; color: #16181d; }
 .lbl span { display: block; font-weight: 400; letter-spacing: 0; text-transform: none;
@@ -34,7 +34,7 @@ td:first-child { font-weight: 700; white-space: nowrap; }
 .mac { background: #e8eaee; color: #3d424b; }
 
 ol.d { margin: 0; padding-left: 0; list-style: none; counter-reset: adr; }
-ol.d li { position: relative; padding-left: 15pt; margin-bottom: 2.6pt; counter-increment: adr; }
+ol.d li { position: relative; padding-left: 15pt; margin-bottom: 2.2pt; counter-increment: adr; }
 ol.d li::before { content: counter(adr, decimal-leading-zero); position: absolute; left: 0; top: .2pt;
   font-size: 6.6pt; font-weight: 700; color: #1d4ed8; letter-spacing: .3pt; }
 ul.i { margin: 0; padding-left: 0; list-style: none; }
@@ -49,7 +49,7 @@ code { font: 7.6pt "SF Mono", Menlo, monospace; background: #f1f2f5; padding: .4
 </style></head><body>
 
 <h1>Second Brain — Design Overview</h1>
-<p class="sub">Working model as agreed through decision 22 · maintained document, enriched as decisions land</p>
+<p class="sub">Working model as agreed through decision 23 · maintained document, enriched as decisions land</p>
 <div class="rule"></div>
 
 <section>
@@ -135,17 +135,17 @@ code { font: 7.6pt "SF Mono", Menlo, monospace; background: #f1f2f5; padding: .4
   <div class="lbl">Decisions<span>docs/adr/</span></div>
   <div>
     <ol class="d">
-      <li><b>Git is the system of record.</b> Not GCS (no history) and not a database (markdown would become second-class). Everything the app computes is a disposable index rebuilt from the repo.</li>
+      <li><b>Git is the system of record.</b> Not GCS (no history), not a database (markdown becomes second-class). Everything computed is a disposable index.</li>
       <li><b>Captures and Notes are separate, single-writer artifacts.</b> Lets the pipeline freely rewrite dictated prose while guaranteeing your original words are never altered.</li>
       <li><b>Notes are read-only, enforced by drift detection.</b> An unenforced invariant is only a hope — Obsidian will happily let you edit one.</li>
-      <li><b>Derived documents never invent identifiers.</b> Notes are 1:1 with Captures; atomicity arrives at the Topic layer instead. Collapses the PRD's "auto-generated Wiki" into the pipeline — a wiki page <em>is</em> a Topic.</li>
+      <li><b>Derived documents never invent identifiers.</b> Notes are 1:1 with Captures; atomicity arrives at the Topic layer. Collapses the PRD's "auto-generated Wiki" into the pipeline — a wiki page <em>is</em> a Topic.</li>
       <li><b>You are the sole naming authority for Topics.</b> The pipeline raises Candidates; you promote them. Canonical naming is a judgement, and an LLM making it yields unstable identity.</li>
       <li><b>Tags and Topics are separate vocabularies.</b> Subjects grow without limit and are Registry-governed; facets are a small closed set the pipeline may never extend. Conflating them is what causes tag sprawl.</li>
       <li><b>Topics are flat files, hierarchy is metadata.</b> Membership is many-to-many and hierarchy is the most volatile structure you have — folders would make every change of mind a migration.</li>
       <li><b>Sources bypass the Registry.</b> A URL is assigned by the world, not chosen, so nothing is invented. Keeps the review list small enough that you'll actually work it.</li>
       <li><b>Provenance is supplied at capture, never inferred.</b> Via the OS share sheet — which makes the mobile app a <em>share target</em>, not a capture app. Missing provenance is marked <code>unresolved</code>, never silently self-attributed.</li>
       <li><b>Topic synthesis is map-reduce over cached Contributions.</b> LLM work sits at the Note level where it is 1:1 and cacheable; Topic assembly stays mechanical. Without this, the 3am job gets slower every week until it stops finishing.</li>
-      <li><b>Every artifact is either derived or decided.</b> The principle the earlier decisions were circling. The one combination that has no home is decided state inside a derived artifact — which is exactly what a checked-off todo would be.</li>
+      <li><b>Every artifact is either derived or decided.</b> The principle the earlier decisions were circling. The combination with no home is decided state inside a derived artifact — exactly what a checked-off todo would be.</li>
       <li><b>Items are proposals; accepting one promotes it to a Task.</b> Reuses the Candidate→Registry pattern instead of a third mechanism. Promotion doubles as triage, and a Task survives replay because decided state is never regenerated.</li>
       <li><b>Compute is split by workload.</b> Pipeline as a Cloud Run Job; the app ships its read index to the browser and the server only commits decided state. Semantic search lives in the pipeline, so embeddings never reach the client.</li>
       <li><b>GitHub hosts the Vault.</b> Google has no general-purpose Git host any more — the one deliberate non-Google dependency, and it brings Actions as a fallback runner.</li>
@@ -154,9 +154,10 @@ code { font: 7.6pt "SF Mono", Menlo, monospace; background: #f1f2f5; padding: .4
       <li><b>The system boundary starts at text.</b> The transcript is the Capture, so audio never enters Git and typing is a first-class input rather than a fallback. Whisper runs locally and is vocabulary-biased with the Registry, so the names you use most transcribe correctly.</li>
       <li><b>The MVP has no app.</b> Obsidian is the whole interface; the review loops are just two files you move a line between. The risk lives in the pipeline, so that is where the first release spends its effort.</li>
       <li><b>The harness guards determinism, not just correctness.</b> Cassettes make LLM calls testable, evals answer "did it get worse" separately from "did it break", and a golden-corpus replay must be byte-identical.</li>
-      <li><b>Backlinks are computed, and the graph is bipartite.</b> Storing them would make every new Capture rewrite old Notes. No Note→Note links — connection runs through a named Topic, so every edge is explainable. Similarity proposes Candidates instead of guessing edges.</li>
+      <li><b>Backlinks are computed, and the graph is bipartite.</b> Storing them would make every new Capture rewrite old Notes. No Note→Note links — connection runs through a named Topic, so every edge is explainable. Similarity proposes Candidates rather than guessing edges.</li>
       <li><b>No contribution graph.</b> A streak counter rewards volume of Captures and would corrupt the corpus it measures. Dormancy — what has gone quiet, what is piling up unreviewed — is the signal worth surfacing.</li>
       <li><b>No LLM-generated HTML views.</b> Enrichment reads untrusted web content, so generated markup is a path from a hostile page to script execution inside a PWA holding the whole knowledge base and a Git credential.</li>
+      <li><b>The Vault is provisioned by an init command.</b> A separate private repository, created and protected by tooling rather than by hand — under a bootstrap credential the operator holds locally, never the runtime one that reaches Cloud Run.</li>
     </ol>
   </div>
 </section>

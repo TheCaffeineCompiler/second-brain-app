@@ -75,9 +75,12 @@ docs/
 ```
 
 **This repository is the application.** The Vault — the user's actual notes — lives in a
-separate, private repository. That separation is deliberate: see
-[ADR-0001](docs/adr/0001-git-repository-as-system-of-record.md) and
-[ADR-0019](docs/adr/0019-the-quality-harness.md).
+separate, private repository, created and protected by the application's `init` command rather
+than by hand, and referenced through configuration. Initialization runs under a bootstrap
+credential held locally; the runtime credential that reaches Cloud Run is scoped to the Vault
+repository alone. See [ADR-0001](docs/adr/0001-git-repository-as-system-of-record.md),
+[ADR-0019](docs/adr/0019-the-quality-harness.md) and
+[ADR-0023](docs/adr/0023-the-vault-is-provisioned-by-an-init-command.md).
 
 ## Roadmap
 
