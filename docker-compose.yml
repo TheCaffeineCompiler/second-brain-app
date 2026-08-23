@@ -18,10 +18,10 @@ services:
     depends_on:
       vault:
         condition: service_completed_successfully
-    environment:
-      VAULT_REMOTE: /srv/vault.git
-      VAULT_WORKING_COPY: /work/vault
+    env_file: .env
     volumes:
-      - ./.vault-remote:/srv
-      - ./.working-copy:/work
+      # Mounted at the same position relative to the workdir as on the host, so the
+      # relative paths in .env resolve identically in both places.
+      - ./.vault-remote:/app/.vault-remote
+      - ./.working-copy:/app/.working-copy
     command: ["list"]

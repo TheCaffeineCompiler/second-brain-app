@@ -110,16 +110,18 @@ same protocol, no network, no auth.
 docker compose up --build          # seeds .vault-remote/vault.git from fixtures/vault
 ```
 
-The pipeline can then be driven either from inside the stack or from your host against the
-same Vault:
+Configuration lives in a single committed `.env` at the project root, read by both docker
+compose and the host CLI, so there is nothing to export:
 
 ```bash
-docker compose run --rm pipeline list          # in the container
-
-export VAULT_REMOTE=$PWD/.vault-remote/vault.git      # or from the host
-export VAULT_WORKING_COPY=$PWD/.working-copy/vault
-cd apps/pipeline && uv run pipeline list
+docker compose run --rm pipeline list      # in the container
+uv run --package pipeline pipeline list    # on the host, from anywhere in the repo
 ```
+
+The paths in `.env` are **relative to the project root**, which is what lets one value be
+correct both inside the container and outside it — the Vault is mounted at the same position
+relative to the working directory in each. Real environment variables always take precedence,
+so deployment sets no file at all.
 
 `.working-copy/vault` is a normal working copy — open it in Obsidian while the pipeline runs
 against it. Re-running `docker compose up` never re-seeds an existing Vault; initialization is
