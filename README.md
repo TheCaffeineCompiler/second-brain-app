@@ -132,8 +132,22 @@ same protocol, no network, no auth.
 docker compose up --build          # seeds .vault-remote/vault.git from fixtures/vault
 ```
 
-Configuration lives in a single committed `.env` at the project root, read by both docker
-compose and the host CLI, so there is nothing to export:
+Configuration lives in a committed `.env` at the project root, read by both docker compose
+and the host CLI, so there is nothing to export. **Secrets and machine-specific choices go
+in `.env.local`**, which is gitignored and overrides `.env`:
+
+```bash
+cat > .env.local <<'ENV'
+LLM_PROVIDER=openai
+LLM_MODEL=llama3.1
+LLM_BASE_URL=http://localhost:11434/v1
+OPENAI_API_KEY=...
+ENV
+```
+
+A test asserts `.env` holds nothing that looks like a secret, because a key put in the
+wrong file is published to everyone who clones the repo and the file cannot tell you so.
+
 
 ```bash
 docker compose run --rm pipeline list      # in the container
@@ -148,6 +162,30 @@ so deployment sets no file at all.
 `.working-copy/vault` is a normal working copy — open it in Obsidian while the pipeline runs
 against it. Re-running `docker compose up` never re-seeds an existing Vault; initialization is
 not destructive (ADR-0023).
+
+## Choosing a language model
+
+Enrichment is not tied to one vendor (ADR-0024). Set the provider through the
+environment:
+
+```bash
+export LLM_PROVIDER=anthropic                      # the default
+export ANTHROPIC_API_KEY=sk-ant-...
+
+export LLM_PROVIDER=openai                         # any OpenAI-compatible endpoint
+export LLM_MODEL=llama3.1                          # Ollama, locally
+export LLM_BASE_URL=http://localhost:11434/v1
+
+pipeline enrich --provider stub                    # offline and deterministic
+```
+
+Both providers are sent the same prompt and the same JSON schema, so a switch
+changes who answers rather than what was asked. Schema adherence varies a great
+deal between models — a reply that ignores the schema fails loudly rather than
+being repaired, because patching one silently would put invented content into the
+Vault under your name.
+
+The provider is part of the pipeline version, so switching re-derives the corpus.
 
 ## Stack
 

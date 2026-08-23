@@ -14,6 +14,7 @@ from pipeline.domain.identity import CaptureId
 from pipeline.domain.vault import Artifact
 
 CAPTURES = "captures"
+NOTES = "notes"
 
 # The pipeline is a distinct writer from the user (ADR-0011), so it commits under
 # its own identity. Passed explicitly rather than read from git config: a Cloud Run
@@ -51,20 +52,41 @@ class GitVault:
         """
         if (into / ".git").exists():
             _git(into, "remote", "set-url", "origin", remote)
-            _git(into, "pull", "--rebase", "--quiet")
+            # A dirty working copy is normal, not an error: the user edits the Vault
+            # in Obsidian. Rebasing would refuse, so skip it and let drift detection
+            # do its job — otherwise the guard can never fire (ADR-0003).
+            if not _git_output(into, "status", "--porcelain"):
+                _git(into, "pull", "--rebase", "--quiet")
         else:
             into.parent.mkdir(parents=True, exist_ok=True)
             _git(into.parent, "clone", "--quiet", remote, str(into))
         return cls(into)
 
     def captures(self) -> list[CaptureId]:
-        directory = self._root / CAPTURES
-        if not directory.is_dir():
-            return []
-        return sorted(CaptureId(path.stem) for path in directory.glob("*.md"))
+        return _identities(self._root / CAPTURES)
 
     def read_capture(self, capture: CaptureId) -> Document:
         return markdown.parse(self._path_of(capture).read_text(encoding="utf-8"))
+
+    def notes(self) -> list[CaptureId]:
+        return _identities(self._root / NOTES)
+
+    def read_note(self, capture: CaptureId) -> Document | None:
+        path = self._root / NOTES / f"{capture}.md"
+        if not path.exists():
+            return None
+        return markdown.parse(path.read_text(encoding="utf-8"))
+
+    def write_notes(self, notes: Mapping[CaptureId, Document], message: str) -> bool:
+        if not notes:
+            return False
+        directory = self._root / NOTES
+        directory.mkdir(parents=True, exist_ok=True)
+        written = []
+        for capture, note in notes.items():
+            (directory / f"{capture}.md").write_text(markdown.render(note), encoding="utf-8")
+            written.append(f"{NOTES}/{capture}.md")
+        return self._commit(message, written)
 
     def has(self, name: str) -> bool:
         return (self._root / PATHS[name]).exists()
@@ -77,14 +99,25 @@ class GitVault:
         """
         if not artifacts:
             return False
+        written = []
         for name, artifact in artifacts.items():
             path = self._root / PATHS[name]
             path.parent.mkdir(parents=True, exist_ok=True)
             text = markdown.render(artifact) if isinstance(artifact, Document) else artifact
             path.write_text(text, encoding="utf-8")
+            written.append(PATHS[name])
 
-        _git(self._root, "add", "-A")
-        if not _git_output(self._root, "status", "--porcelain"):
+        return self._commit(message, written)
+
+    def _commit(self, message: str, paths: list[str]) -> bool:
+        """Commit only what the pipeline wrote.
+
+        Never `add -A`: the working copy may hold the user's own edits, and
+        committing those under the pipeline's identity would misattribute them
+        and quietly absorb work the pipeline is supposed to refuse to touch.
+        """
+        _git(self._root, "add", "--", *paths)
+        if not _git_output(self._root, "diff", "--cached", "--name-only"):
             return False
         name, email = AUTHOR
         _git(
@@ -103,6 +136,12 @@ class GitVault:
 
     def _path_of(self, capture: CaptureId) -> Path:
         return self._root / CAPTURES / f"{capture}.md"
+
+
+def _identities(directory: Path) -> list[CaptureId]:
+    if not directory.is_dir():
+        return []
+    return sorted(CaptureId(path.stem) for path in directory.glob("*.md"))
 
 
 def _git_output(cwd: Path, *arguments: str) -> str:

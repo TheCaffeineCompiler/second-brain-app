@@ -46,7 +46,11 @@ def project_root() -> Path:
     """
     env_file = find_dotenv(usecwd=True)
     load_dotenv(env_file)
-    return Path(env_file).parent if env_file else Path.cwd()
+    root = Path(env_file).parent if env_file else Path.cwd()
+    # .env.local is gitignored and holds secrets and machine-specific choices, so
+    # it overrides the committed defaults.
+    load_dotenv(root / ".env.local", override=True)
+    return root
 
 
 def working_copy() -> Path:

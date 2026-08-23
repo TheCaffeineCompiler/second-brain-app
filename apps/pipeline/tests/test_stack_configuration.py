@@ -16,6 +16,16 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def vault_paths() -> dict[str, str]:
+    """Only the VAULT_ settings are paths.
+
+    .env also carries provider configuration, which is not a path and must not be
+    asserted as one — an earlier version of this test assumed every value was a
+    path and broke the moment the file grew a second kind of setting.
+    """
+    return {k: v for k, v in dotenv().items() if k.startswith("VAULT_")}
+
+
 def dotenv() -> dict[str, str]:
     entries = (
         line.split("=", 1)
@@ -53,13 +63,13 @@ def _pipeline() -> dict[str, Any]:
 
 def test_the_configured_paths_are_relative() -> None:
     """An absolute path cannot be correct in both places at once."""
-    for key, value in dotenv().items():
+    for key, value in vault_paths().items():
         assert not value.startswith("/"), f"{key} is absolute, so it can only suit one side"
 
 
 def test_the_container_mounts_the_vault_where_the_relative_paths_resolve() -> None:
     mounts = pipeline_mounts()
-    for key, value in dotenv().items():
+    for key, value in vault_paths().items():
         directory = Path(value).parts[0]
         expected = f"{workdir()}/{directory}"
         actual = mounts.get(f"./{directory}")
@@ -77,3 +87,23 @@ def test_the_vault_is_reachable_from_the_host() -> None:
     """A named volume has no host path, so the CLI could not run outside the stack."""
     for host in pipeline_mounts():
         assert host.startswith("./"), f"{host} is not a host bind mount"
+
+
+SECRETS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
+
+
+def test_the_committed_env_file_holds_no_secrets() -> None:
+    """.env is committed; .env.local is gitignored and overrides it.
+
+    A key placed in the wrong one is published to everyone who clones the repo,
+    and the file cannot tell you that itself.
+    """
+    for key in dotenv():
+        assert not any(marker in key.upper() for marker in SECRETS), (
+            f"{key} looks like a secret and .env is committed — put it in .env.local"
+        )
+
+
+def test_env_local_is_not_tracked() -> None:
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").split()
+    assert ".env.local" in gitignore
