@@ -101,6 +101,32 @@ Slices 1–3 are a decision point, not a milestone. If derived Topics turn out n
 the answer is to fix enrichment rather than proceed — and having built no app is what keeps
 that cheap.
 
+## Local development
+
+The stack runs entirely offline. A bare repository stands in for GitHub over the filesystem —
+same protocol, no network, no auth.
+
+```bash
+docker compose up --build          # seeds .vault-remote/vault.git from fixtures/vault
+```
+
+Configuration lives in a single committed `.env` at the project root, read by both docker
+compose and the host CLI, so there is nothing to export:
+
+```bash
+docker compose run --rm pipeline list      # in the container
+uv run --package pipeline pipeline list    # on the host, from anywhere in the repo
+```
+
+The paths in `.env` are **relative to the project root**, which is what lets one value be
+correct both inside the container and outside it — the Vault is mounted at the same position
+relative to the working directory in each. Real environment variables always take precedence,
+so deployment sets no file at all.
+
+`.working-copy/vault` is a normal working copy — open it in Obsidian while the pipeline runs
+against it. Re-running `docker compose up` never re-seeds an existing Vault; initialization is
+not destructive (ADR-0023).
+
 ## Stack
 
 Markdown in Git, in Google's [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md).

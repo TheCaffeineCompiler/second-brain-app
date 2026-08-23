@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/pipeline
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync
+
+      # Each gate runs even if an earlier one failed, so the summary reports every
+      # problem at once rather than only the first.
+      - id: lint
+        name: Lint
+        continue-on-error: true
+        run: uv run ruff check --output-format=github .
+      - id: format
+        name: Format
+        continue-on-error: true
+        run: uv run ruff format --check .
+      - id: types
+        name: Types
+        continue-on-error: true
+        run: uv run mypy
+      - id: tests
+        name: Tests
+        continue-on-error: true
+        run: uv run pytest -q --junitxml=junit.xml --cov --cov-report=xml
+
+      - name: Quality summary
+        if: always()
+        env:
+          LINT: ${{ steps.lint.outcome }}
+          FORMAT: ${{ steps.format.outcome }}
+          TYPES: ${{ steps.types.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+        run: uv run python ../../scripts/quality_summary.py . >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if any gate failed
+        if: always()
+        env:
+          OUTCOMES: >-
+            ${{ steps.lint.outcome }} ${{ steps.format.outcome }}
+            ${{ steps.types.outcome }} ${{ steps.tests.outcome }}
+        run: |
+          for outcome in $OUTCOMES; do
+            [ "$outcome" = success ] || exit 1
+          done
+
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      # The reported failure was only visible end to end: the stack seeds a Vault,
+      # and the CLI must read it both inside the container and from the host with
+      # nothing exported.
+      - name: Stack seeds a Vault and reads it
+        run: |
+          docker compose up --build
+          captures=$(docker compose run --rm pipeline list)
+          echo "$captures"
+          test "$(echo "$captures" | sort | tr '\n' ' ')" = "2026-08-21T0902 2026-08-23T1714 "
+
+      - name: Host reads the same Vault with nothing exported
+        env:
+          # The container created .working-copy as root; the host needs its own.
+          VAULT_WORKING_COPY: .working-copy-host/vault
+        run: |
+          git config --global --add safe.directory '*'
+          captures=$(uv run --package pipeline pipeline list)
+          echo "$captures"
+          test "$(echo "$captures" | sort | tr '\n' ' ')" = "2026-08-21T0902 2026-08-23T1714 "
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Stack"
+            echo
+            if [ "${{ job.status }}" = success ]; then
+              echo "✅ The stack seeds a Vault and the CLI reads it from the container and the host."
+            else
+              echo "❌ The stack failed — see the job log."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Conventional commits
+        run: |
+          pattern='^(feat|fix|docs|test|refactor|chore|build|ci|perf)(\([a-z0-9-]+\))?!?: .+'
+          failed=0
+          # --no-merges: pull_request checkouts synthesise a merge commit that no
+          # contributor authored and that can never match the pattern.
+          while read -r subject; do
+            if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
+              echo "not a conventional commit: $subject"
+              failed=1
+            fi
+          done < <(git log --no-merges --format=%s origin/${{ github.base_ref }}..HEAD)
+          exit $failed
+        shell: bash

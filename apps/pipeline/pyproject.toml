@@ -1,0 +1,50 @@
+[project]
+name = "pipeline"
+version = "0.1.0"
+description = "Enrichment pipeline for the Second Brain vault"
+requires-python = ">=3.12"
+dependencies = [
+    "python-dotenv>=1.2.3",
+    "pyyaml>=6.0.2",
+]
+
+[project.scripts]
+pipeline = "pipeline.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-pyyaml>=6.0",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+# source_pkgs, not source: subprocesses run in a temporary directory, where a
+# relative source path resolves to nothing and silently measures zero.
+source_pkgs = ["pipeline"]
+parallel = true
+
+[tool.coverage.report]
+# A Protocol has no runtime body, so its lines can never be executed.
+exclude_also = ["^\\s*\\.\\.\\.$", "class .*\\bProtocol\\b"]

@@ -1,0 +1,27 @@
+# Offline development stack (ADR-0019). A bare repository stands in for GitHub over
+# the filesystem — same protocol, no network, no auth. The working copy is mounted so
+# it can be opened in Obsidian while the pipeline runs against it. The bare repo is
+# bind-mounted rather than a named volume so the CLI can be run from the host too.
+services:
+  vault:
+    image: alpine/git:latest
+    volumes:
+      - ./.vault-remote:/srv
+      - ./fixtures/vault:/seed:ro
+      - ./scripts/seed-vault.sh:/seed-vault.sh:ro
+    entrypoint: ["sh", "/seed-vault.sh"]
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: apps/pipeline/Dockerfile
+    depends_on:
+      vault:
+        condition: service_completed_successfully
+    env_file: .env
+    volumes:
+      # Mounted at the same position relative to the workdir as on the host, so the
+      # relative paths in .env resolve identically in both places.
+      - ./.vault-remote:/app/.vault-remote
+      - ./.working-copy:/app/.working-copy
+    command: ["list"]
