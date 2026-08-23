@@ -5,13 +5,29 @@ format; the domain sees only identities and Documents (ADR-0016).
 """
 
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 from pipeline.adapters import markdown
 from pipeline.domain.document import Document
 from pipeline.domain.identity import CaptureId
+from pipeline.domain.vault import Artifact
 
 CAPTURES = "captures"
+
+# The pipeline is a distinct writer from the user (ADR-0011), so it commits under
+# its own identity. Passed explicitly rather than read from git config: a Cloud Run
+# Job has no ambient identity, and depending on the machine's would make commit
+# authorship vary with where the pipeline happened to run.
+AUTHOR = ("Second Brain pipeline", "pipeline@second-brain.local")
+
+# The adapter owns paths; the domain names artifacts (ADR-0016).
+PATHS = {
+    "registry": "registry.md",
+    "readme": "README.md",
+    "log": "log.md",
+    "captures": f"{CAPTURES}/.gitkeep",
+}
 
 
 class GitError(RuntimeError):
@@ -50,8 +66,48 @@ class GitVault:
     def read_capture(self, capture: CaptureId) -> Document:
         return markdown.parse(self._path_of(capture).read_text(encoding="utf-8"))
 
+    def has(self, name: str) -> bool:
+        return (self._root / PATHS[name]).exists()
+
+    def write(self, artifacts: Mapping[str, Artifact], message: str) -> bool:
+        """Commit the artifacts as a single revision, then push.
+
+        One commit per run rather than per file, and nothing is committed when
+        nothing changed — so a run over an unchanged Vault leaves no trace.
+        """
+        if not artifacts:
+            return False
+        for name, artifact in artifacts.items():
+            path = self._root / PATHS[name]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            text = markdown.render(artifact) if isinstance(artifact, Document) else artifact
+            path.write_text(text, encoding="utf-8")
+
+        _git(self._root, "add", "-A")
+        if not _git_output(self._root, "status", "--porcelain"):
+            return False
+        name, email = AUTHOR
+        _git(
+            self._root,
+            "-c",
+            f"user.name={name}",
+            "-c",
+            f"user.email={email}",
+            "commit",
+            "--quiet",
+            "-m",
+            message,
+        )
+        _git(self._root, "push", "--quiet", "origin", "HEAD")
+        return True
+
     def _path_of(self, capture: CaptureId) -> Path:
         return self._root / CAPTURES / f"{capture}.md"
+
+
+def _git_output(cwd: Path, *arguments: str) -> str:
+    result = subprocess.run(["git", *arguments], cwd=cwd, capture_output=True, text=True)
+    return result.stdout.strip()
 
 
 def _git(cwd: Path, *arguments: str) -> None:

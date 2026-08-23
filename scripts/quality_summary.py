@@ -17,6 +17,10 @@ AREAS = {
     "test_git_vault": "Vault adapter — Git as the system of record (ADR-0001)",
     "test_end_to_end": "End to end — the CLI as a person runs it",
     "test_stack_configuration": "Stack — container and host agree on the Vault",
+    "test_skeleton": "Skeleton — a fresh Vault seeds decided artifacts only (ADR-0011)",
+    "test_provisioning": "Provisioning — initialisation is never destructive (ADR-0023)",
+    "test_provision_flow": "Provisioning — create, protect, seed (ADR-0023)",
+    "test_invariants": "Invariants — rules the ADRs make mechanically checkable",
 }
 PASS, FAIL = "✅", "❌"
 

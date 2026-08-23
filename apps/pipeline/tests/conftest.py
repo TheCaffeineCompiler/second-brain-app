@@ -25,16 +25,15 @@ def vault_remote(tmp_path: Path) -> Seed:
         staging = tmp_path / "staging"
         subprocess.run(["git", "init", "--bare", "-q", "-b", "main", str(bare)], check=True)
         subprocess.run(["git", "clone", "-q", str(bare), str(staging)], check=True)
-        # OKF reserves log.md for chronological history; it also guarantees the
-        # seeded repository has a commit even when there are no Captures.
-        (staging / "log.md").write_text("# Log\n", encoding="utf-8")
         directory = staging / "captures"
         directory.mkdir()
         for name, text in captures.items():
             (directory / f"{name}.md").write_text(text, encoding="utf-8")
         for arguments in (
             ["add", "-A"],
-            ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "seed"],
+            # --allow-empty so that seeding no Captures yields a genuinely empty
+            # Vault with a commit, rather than one containing a placeholder file.
+            ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "seed", "--allow-empty"],
             ["push", "-q", "origin", "main"],
         ):
             subprocess.run(["git", *arguments], cwd=staging, check=True)

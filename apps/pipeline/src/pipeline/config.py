@@ -10,6 +10,14 @@ from pathlib import Path
 
 from dotenv import find_dotenv, load_dotenv
 
+UNSET = """VAULT_REMOTE is not set — it names the Vault repository.
+
+  For local development it comes from .env in the project root, so run this from
+  inside the repository after `docker compose up`.
+
+  Otherwise set it explicitly, or run `pipeline init <owner>/<name>` to create it:
+    export VAULT_REMOTE=https://github.com/<owner>/second-brain-vault.git"""
+
 
 @dataclass(frozen=True)
 class Config:
@@ -18,30 +26,32 @@ class Config:
 
     @classmethod
     def from_environment(cls) -> "Config":
-        """Read configuration, resolving relative paths against the project root.
-
-        A local `.env` supplies development defaults; real environment variables
-        always win, so deployment sets no file at all. Relative paths are resolved
-        against the directory holding that file rather than the current one, so the
-        command works from anywhere in the repository.
-        """
-        env_file = find_dotenv(usecwd=True)
-        load_dotenv(env_file)
-        root = Path(env_file).parent if env_file else Path.cwd()
-
+        root = project_root()
         remote = os.environ.get("VAULT_REMOTE")
         if not remote:
-            raise SystemExit(
-                "VAULT_REMOTE is not set — it names the Vault repository.\n\n"
-                "  For local development it comes from .env in the project root, so run\n"
-                "  this from inside the repository after `docker compose up`.\n\n"
-                "  Otherwise set it explicitly:\n"
-                "    export VAULT_REMOTE=git@github.com:<owner>/second-brain-vault.git"
-            )
+            raise SystemExit(UNSET)
         return cls(
             vault_remote=str(_resolve(remote, root)) if _is_path(remote) else remote,
-            working_copy=_resolve(os.environ.get("VAULT_WORKING_COPY", "vault"), root),
+            working_copy=working_copy(),
         )
+
+
+def project_root() -> Path:
+    """Where relative configuration is anchored.
+
+    A local .env supplies development defaults; real environment variables always
+    win, so deployment sets no file at all. Relative paths resolve against the
+    directory holding that file rather than the current one, so the command works
+    from anywhere in the repository.
+    """
+    env_file = find_dotenv(usecwd=True)
+    load_dotenv(env_file)
+    return Path(env_file).parent if env_file else Path.cwd()
+
+
+def working_copy() -> Path:
+    """Where the Vault is checked out. Needed before a remote is known, by `init`."""
+    return _resolve(os.environ.get("VAULT_WORKING_COPY", "vault"), project_root())
 
 
 def _is_path(remote: str) -> bool:
