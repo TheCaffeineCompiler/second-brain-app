@@ -26,6 +26,34 @@ jobs:
       - name: Tests
         run: uv run pytest -q
 
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      # The reported failure was only visible end to end: the stack seeds a Vault,
+      # and the CLI must read it both inside the container and from the host with
+      # nothing exported.
+      - name: Stack seeds a Vault and reads it
+        run: |
+          docker compose up --build
+          captures=$(docker compose run --rm pipeline list)
+          echo "$captures"
+          test "$(echo "$captures" | sort | tr '\n' ' ')" = "2026-08-21T0902 2026-08-23T1714 "
+
+      - name: Host reads the same Vault with nothing exported
+        env:
+          # The container created .working-copy as root; the host needs its own.
+          VAULT_WORKING_COPY: .working-copy-host/vault
+        run: |
+          git config --global --add safe.directory '*'
+          captures=$(uv run --package pipeline pipeline list)
+          echo "$captures"
+          test "$(echo "$captures" | sort | tr '\n' ' ')" = "2026-08-21T0902 2026-08-23T1714 "
+
   commits:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

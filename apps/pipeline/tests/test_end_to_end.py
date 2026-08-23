@@ -1,0 +1,90 @@
+"""End-to-end tests for the path a person actually takes.
+
+These exist because running the CLI on the host after `docker compose up` failed
+in three separate ways at once: the Vault had no host-reachable path, the working
+copy's origin pointed at a path that existed only inside the container, and every
+git failure arrived with its diagnostic discarded.
+"""
+
+import subprocess
+import sys
+from pathlib import Path
+
+from tests.conftest import SEED_CAPTURE, Seed
+
+DOTENV = """VAULT_REMOTE=.vault-remote/vault.git
+VAULT_WORKING_COPY=.working-copy/vault
+"""
+
+
+def run_cli(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Invoke the CLI the way a person does — a fresh process, no inherited config."""
+    return subprocess.run(
+        [sys.executable, "-c", "from pipeline.cli import main; main()", *arguments],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": str(cwd)},
+    )
+
+
+def project(tmp_path: Path, remote: str) -> Path:
+    """A project root holding a .env, with the Vault where .env says it is."""
+    root = tmp_path / "project"
+    (root / "apps" / "pipeline").mkdir(parents=True)
+    (root / ".env").write_text(DOTENV, encoding="utf-8")
+    Path(root / ".vault-remote").symlink_to(Path(remote).parent)
+    return root
+
+
+def test_the_cli_reads_captures_with_nothing_exported(vault_remote: Seed, tmp_path: Path) -> None:
+    """The reported failure: `pipeline list` on the host after docker compose."""
+    root = project(tmp_path, vault_remote({"2026-08-23T1714": SEED_CAPTURE}))
+    result = run_cli("list", cwd=root)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.split() == ["2026-08-23T1714"]
+
+
+def test_the_cli_works_from_a_subdirectory(vault_remote: Seed, tmp_path: Path) -> None:
+    """Relative paths resolve against the .env, not the current directory."""
+    root = project(tmp_path, vault_remote({"2026-08-23T1714": SEED_CAPTURE}))
+    result = run_cli("list", cwd=root / "apps" / "pipeline")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.split() == ["2026-08-23T1714"]
+
+
+def test_a_working_copy_moves_between_container_and_host(
+    vault_remote: Seed, tmp_path: Path
+) -> None:
+    """A working copy cloned in the container is then opened from the host, where
+    the container's remote path does not exist."""
+    root = project(tmp_path, vault_remote({"2026-08-23T1714": SEED_CAPTURE}))
+    assert run_cli("list", cwd=root).returncode == 0
+
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "/srv/vault.git"],
+        cwd=root / ".working-copy" / "vault",
+        check=True,
+        capture_output=True,
+    )
+    result = run_cli("list", cwd=root)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.split() == ["2026-08-23T1714"]
+
+
+def test_an_unreachable_vault_reports_what_git_said(tmp_path: Path) -> None:
+    """A failure must never arrive as a bare CalledProcessError."""
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / ".env").write_text(DOTENV, encoding="utf-8")
+    result = run_cli("list", cwd=root)
+    assert result.returncode != 0
+    assert "git clone" in result.stderr
+    assert "vault.git" in result.stderr
+
+
+def test_missing_configuration_says_what_to_do(tmp_path: Path) -> None:
+    result = run_cli("list", cwd=tmp_path)
+    assert result.returncode != 0
+    assert "VAULT_REMOTE is not set" in result.stderr
+    assert ".env" in result.stderr
