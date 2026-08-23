@@ -21,6 +21,8 @@ AREAS = {
     "test_provisioning": "Provisioning — initialisation is never destructive (ADR-0023)",
     "test_provision_flow": "Provisioning — create, protect, seed (ADR-0023)",
     "test_invariants": "Invariants — rules the ADRs make mechanically checkable",
+    "test_enrichment": "Enrichment — staleness is a hash, drift is refused (ADR-0003)",
+    "test_run": "Enrichment runs — incremental, and never overwrites your edits (ADR-0010)",
 }
 PASS, FAIL = "✅", "❌"
 

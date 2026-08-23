@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Enrichment pipeline for the Second Brain vault"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=1.0.0",
     "python-dotenv>=1.2.3",
     "pyyaml>=6.0.2",
 ]

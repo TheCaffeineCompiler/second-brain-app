@@ -26,6 +26,14 @@ class Vault(Protocol):
         """The Capture with this identity."""
         ...
 
+    def read_note(self, capture: CaptureId) -> Document | None:
+        """The Note derived from this Capture, if one exists yet."""
+        ...
+
+    def write_notes(self, notes: "Mapping[CaptureId, Document]", message: str) -> bool:
+        """Commit these Notes as one revision. False when there was nothing to do."""
+        ...
+
     def has(self, name: str) -> bool:
         """Whether this artifact already exists."""
         ...
