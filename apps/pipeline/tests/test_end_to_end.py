@@ -125,3 +125,13 @@ def test_missing_configuration_says_what_to_do(tmp_path: Path) -> None:
     assert result.returncode != 0
     assert "VAULT_REMOTE is not set" in result.stderr
     assert ".env" in result.stderr
+
+
+def test_init_does_not_require_a_vault_remote(tmp_path: Path) -> None:
+    """init is what creates the thing VAULT_REMOTE points at, so it cannot need it."""
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / ".env").write_text("VAULT_WORKING_COPY=vault\n", encoding="utf-8")
+    result = run_cli("init", "--help", cwd=root)
+    assert result.returncode == 0, result.stderr
+    assert "VAULT_REMOTE is not set" not in result.stdout + result.stderr

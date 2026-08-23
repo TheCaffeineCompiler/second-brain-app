@@ -35,3 +35,19 @@ human-written `registry.md` and the `log.md` that OKF reserves for chronological
 
 Branch protection — blocking force-push and branch deletion — is applied by `init` rather than
 left to a manual step, so a Vault cannot exist in an unprotected state.
+
+## Amendment: branch protection is not available
+
+Provisioning the real Vault showed that GitHub refuses branch protection on a private
+repository without a paid plan: *"Upgrade to GitHub Pro or make this repository public
+to enable this feature."* Making the Vault public is not an option — it holds personal
+notes — so the platform cannot enforce the guarantee ADR-0019 relies on.
+
+`init` therefore treats protection as best-effort: it attempts it, and when refused it
+reports loudly that force-push is **not** blocked rather than failing or passing
+silently. The guard moves into the code instead, which is arguably the better place for
+it since it sits at the point of action: no module may pass `--force`, `--force-with-lease`
+or `--mirror` to git, asserted over the source as an executable invariant.
+
+If the Vault ever warrants it, GitHub Pro restores platform-level enforcement and the
+code guard remains as a second layer.

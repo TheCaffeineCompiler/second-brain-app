@@ -101,6 +101,28 @@ Slices 1–3 are a decision point, not a milestone. If derived Topics turn out n
 the answer is to fix enrichment rather than proceed — and having built no app is what keeps
 that cheap.
 
+## Provisioning a Vault
+
+The Vault is a separate private repository, created by the application rather than by
+hand (ADR-0023):
+
+```bash
+pipeline init <owner>/second-brain-vault
+```
+
+This creates it private, applies branch protection, and seeds the skeleton — the Registry,
+a README, `log.md` and the `captures/` region. It seeds **decided artifacts only**; the
+derived regions appear when the pipeline first writes them. Running it again is safe: it
+fills only what is absent and never overwrites.
+
+`init` authenticates through your own `gh` login, which is the bootstrap credential — it is
+never deployed. The runtime credential is separate and can only push, so nothing that
+reaches Cloud Run is able to create or delete a repository.
+
+> **Branch protection needs GitHub Pro on private repositories.** Without it, `init` warns
+> that force-push is not blocked and continues. The code carries its own guard — no module
+> may pass `--force` to git, asserted as an executable invariant.
+
 ## Local development
 
 The stack runs entirely offline. A bare repository stands in for GitHub over the filesystem —
