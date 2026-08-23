@@ -1,0 +1,174 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Second Brain — Design Overview</title>
+<style>
+@page { size: A4; margin: 13mm 14mm 12mm 14mm; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  font: 8.6pt/1.42 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #16181d; margin: 0;
+}
+h1 { font-size: 17pt; letter-spacing: -.35pt; margin: 0 0 1pt; font-weight: 700; }
+.sub { font-size: 8pt; color: #6b7280; margin: 0 0 9pt; }
+.rule { height: 2.2pt; background: #16181d; margin: 0 0 11pt; }
+
+section.brk { break-inside: auto; }
+ol.d li, ul.i li, ul.q li { break-inside: avoid; }
+section { display: grid; grid-template-columns: 26mm 1fr; gap: 0 6mm;
+          padding: 7pt 0 0; border-top: .4pt solid #d6d9de; margin-top: 7pt; break-inside: avoid; }
+section:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.lbl { font-size: 7pt; font-weight: 700; letter-spacing: .7pt; text-transform: uppercase; color: #16181d; }
+.lbl span { display: block; font-weight: 400; letter-spacing: 0; text-transform: none;
+            color: #8b9099; margin-top: 2pt; font-size: 6.8pt; line-height: 1.3; }
+p { margin: 0 0 4pt; }
+b, strong { font-weight: 700; }
+em { font-style: italic; color: #3d424b; }
+
+table { width: 100%; border-collapse: collapse; font-size: 7.7pt; }
+th { text-align: left; font-size: 6.7pt; letter-spacing: .5pt; text-transform: uppercase;
+     color: #8b9099; font-weight: 700; padding: 0 5pt 3pt 0; border-bottom: .4pt solid #16181d; }
+td { padding: 3.1pt 5pt 3.1pt 0; border-bottom: .3pt solid #e6e8ec; vertical-align: top; }
+td:first-child { font-weight: 700; white-space: nowrap; }
+.who { font-size: 6.9pt; padding: .6pt 3.4pt; border-radius: 2pt; white-space: nowrap; font-weight: 700; }
+.hum { background: #1d4ed8; color: #fff; }
+.mac { background: #e8eaee; color: #3d424b; }
+
+ol.d { margin: 0; padding-left: 0; list-style: none; counter-reset: adr; }
+ol.d li { position: relative; padding-left: 15pt; margin-bottom: 2.6pt; counter-increment: adr; }
+ol.d li::before { content: counter(adr, decimal-leading-zero); position: absolute; left: 0; top: .2pt;
+  font-size: 6.6pt; font-weight: 700; color: #1d4ed8; letter-spacing: .3pt; }
+ul.i { margin: 0; padding-left: 0; list-style: none; }
+ul.i li { padding-left: 10pt; margin-bottom: 3.4pt; position: relative; }
+ul.i li::before { content: "→"; position: absolute; left: 0; color: #1d4ed8; font-weight: 700; }
+ul.q { margin: 0; padding-left: 0; list-style: none; font-size: 8.2pt; }
+ul.q li { padding-left: 10pt; margin-bottom: 2.6pt; position: relative; color: #3d424b; }
+ul.q li::before { content: "?"; position: absolute; left: 0; color: #b45309; font-weight: 700; }
+code { font: 7.6pt "SF Mono", Menlo, monospace; background: #f1f2f5; padding: .4pt 2.4pt; border-radius: 2pt; }
+.foot { margin-top: 9pt; padding-top: 5pt; border-top: .4pt solid #d6d9de;
+        font-size: 6.9pt; color: #8b9099; }
+</style></head><body>
+
+<h1>Second Brain — Design Overview</h1>
+<p class="sub">Working model as agreed through decision 22 · maintained document, enriched as decisions land</p>
+<div class="rule"></div>
+
+<section>
+  <div class="lbl">Premise<span>What the system is</span></div>
+  <div>
+    <p>You dictate unstructured thoughts — mostly takeaways from podcasts, blogposts and meetings. An agentic pipeline turns them into a structured, linked, searchable knowledge base. Everything is markdown in a Git repository, so the knowledge outlives the app.</p>
+    <p><b>The organising idea: every artifact is either <em>derived</em> or <em>decided</em>.</b> Derived artifacts are pipeline-owned, disposable and rebuilt from scratch at will. Decided artifacts are human-owned, durable and never regenerated. Nothing is both. Almost every rule below follows from that one split.</p>
+  </div>
+</section>
+
+<section>
+  <div class="lbl">Artifacts<span>The vocabulary</span></div>
+  <div>
+    <table>
+      <tr><th>Term</th><th>What it is</th><th>Writer</th><th>Identity from</th></tr>
+      <tr><td>Capture</td><td>A raw thought as you recorded it, unedited by the system</td><td><span class="who hum">decided</span></td><td>Timestamp</td></tr>
+      <tr><td>Task</td><td>An Item you accepted — durable work, outlives the Note it came from</td><td><span class="who hum">decided</span></td><td>Its own</td></tr>
+      <tr><td>Registry</td><td>Canonical entity names and their aliases — the naming authority</td><td><span class="who hum">decided</span></td><td>You</td></tr>
+      <tr><td>Note</td><td>A cleaned, tagged, linked document derived from one Capture</td><td><span class="who mac">derived</span></td><td>Its Capture</td></tr>
+      <tr><td>Contribution</td><td>The few claims one Note makes about one Topic — the cached unit</td><td><span class="who mac">derived</span></td><td>Note + Topic</td></tr>
+      <tr><td>Topic</td><td>A synthesis of what you know about one entity, plus a link index</td><td><span class="who mac">derived</span></td><td>Registry name</td></tr>
+      <tr><td>Source</td><td>Where a Capture came from: podcast, blogpost, book, meeting</td><td><span class="who mac">derived</span></td><td>URL (external)</td></tr>
+      <tr><td>Candidate</td><td>An entity the pipeline noticed that you haven't admitted yet</td><td><span class="who mac">derived</span></td><td>—</td></tr>
+      <tr><td>Kind</td><td>What sort of Capture a Note came from — one per Note, closed set</td><td><span class="who mac">derived</span></td><td>—</td></tr>
+      <tr><td>Item</td><td>A proposed task, question or decision — promote it to make it real</td><td><span class="who mac">derived</span></td><td>—</td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="lbl">Flow<span>Capture to knowledge</span></div>
+  <div>
+<svg viewBox="0 0 560 122" style="width:100%;height:auto" font-family="Helvetica Neue, Helvetica, Arial" font-size="8.5">
+  <defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="2.6" orient="auto">
+    <path d="M0,0 L6,2.6 L0,5.2 z" fill="#8b9099"/></marker>
+    <marker id="b" markerWidth="7" markerHeight="7" refX="6" refY="2.6" orient="auto">
+    <path d="M0,0 L6,2.6 L0,5.2 z" fill="#1d4ed8"/></marker></defs>
+  <g stroke="#8b9099" stroke-width="1" marker-end="url(#a)" fill="none">
+    <path d="M92,52 H124"/><path d="M196,52 H228"/><path d="M300,52 H332"/><path d="M420,52 H452"/>
+    <path d="M488,68 V100 H48 V72" stroke-dasharray="2.5 2.5"/>
+  </g>
+  <g stroke="#1d4ed8" stroke-width="1" marker-end="url(#b)" fill="none">
+    <path d="M48,19 V32"/><path d="M488,19 V32"/>
+  </g>
+  <g>
+    <rect x="0" y="0" width="96" height="19" rx="3" fill="#fff" stroke="#1d4ed8"/>
+    <text x="48" y="13" fill="#1d4ed8" text-anchor="middle" font-weight="700" font-size="7.6">Source · share sheet</text>
+    <rect x="440" y="0" width="96" height="19" rx="3" fill="#fff" stroke="#1d4ed8"/>
+    <text x="488" y="13" fill="#1d4ed8" text-anchor="middle" font-weight="700" font-size="7.6">Registry gates</text>
+    <rect x="4" y="36" width="88" height="32" rx="3" fill="#1d4ed8"/>
+    <text x="48" y="56" fill="#fff" text-anchor="middle" font-weight="700">Capture</text>
+    <rect x="124" y="36" width="72" height="32" rx="3" fill="#fff" stroke="#c3c7ce" stroke-dasharray="3 2"/>
+    <text x="160" y="56" fill="#3d424b" text-anchor="middle">Enrich</text>
+    <rect x="228" y="36" width="72" height="32" rx="3" fill="#e8eaee"/>
+    <text x="264" y="56" text-anchor="middle" font-weight="700">Note</text>
+    <rect x="332" y="36" width="88" height="32" rx="3" fill="#e8eaee"/>
+    <text x="376" y="56" text-anchor="middle" font-weight="700">Contribution</text>
+    <rect x="452" y="36" width="72" height="32" rx="3" fill="#e8eaee"/>
+    <text x="488" y="56" text-anchor="middle" font-weight="700">Topic</text>
+  </g>
+  <text x="268" y="112" fill="#8b9099" font-size="7" text-anchor="middle">you read here — a thought while reading comes back as a new Capture, never an edit</text>
+</svg>
+    <p style="margin-top:3pt"><b>Nightly:</b> new Captures sync → Notes derived → Contributions extracted and cached → only Topics whose Contribution set actually changed are re-synthesised. Cost scales with what you captured that day, never with the size of the corpus.</p>
+  </div>
+</section>
+
+<section>
+  <div class="lbl">Invariants<span>The load-bearing rules</span></div>
+  <div>
+    <ul class="i">
+      <li><b>One writer per artifact.</b> You write Captures and the Registry; the pipeline writes everything else. Conflicts are impossible rather than resolved.</li>
+      <li><b>Nothing invents an identifier.</b> A Note inherits its Capture's identity, a Topic its Registry name, a Source its URL. Anything an LLM would have to name freely is forbidden, because it drifts between runs and rots every link.</li>
+      <li><b>Never guess, leave it unresolved.</b> A wrong entity match or wrong source URL is silent and permanent; an unresolved mention is visible and harmless.</li>
+      <li><b>Decided state never lives on a derived artifact.</b> Anything you choose — a promoted entity, an accepted task — needs a durable home with identity of its own, or the next replay destroys it.</li>
+      <li><b>Derived artifacts are disposable.</b> Delete and replay at any time. Improving the pipeline is a replay, never a migration.</li>
+      <li><b>Staleness is a hash, not a timestamp.</b> A timestamp records when work happened; only a content hash plus pipeline version says whether it needs doing again.</li>
+      <li><b>You never hand-edit a derived artifact.</b> Drift detection catches it and refuses to overwrite rather than destroying the edit.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="brk">
+  <div class="lbl">Decisions<span>docs/adr/</span></div>
+  <div>
+    <ol class="d">
+      <li><b>Git is the system of record.</b> Not GCS (no history) and not a database (markdown would become second-class). Everything the app computes is a disposable index rebuilt from the repo.</li>
+      <li><b>Captures and Notes are separate, single-writer artifacts.</b> Lets the pipeline freely rewrite dictated prose while guaranteeing your original words are never altered.</li>
+      <li><b>Notes are read-only, enforced by drift detection.</b> An unenforced invariant is only a hope — Obsidian will happily let you edit one.</li>
+      <li><b>Derived documents never invent identifiers.</b> Notes are 1:1 with Captures; atomicity arrives at the Topic layer instead. Collapses the PRD's "auto-generated Wiki" into the pipeline — a wiki page <em>is</em> a Topic.</li>
+      <li><b>You are the sole naming authority for Topics.</b> The pipeline raises Candidates; you promote them. Canonical naming is a judgement, and an LLM making it yields unstable identity.</li>
+      <li><b>Tags and Topics are separate vocabularies.</b> Subjects grow without limit and are Registry-governed; facets are a small closed set the pipeline may never extend. Conflating them is what causes tag sprawl.</li>
+      <li><b>Topics are flat files, hierarchy is metadata.</b> Membership is many-to-many and hierarchy is the most volatile structure you have — folders would make every change of mind a migration.</li>
+      <li><b>Sources bypass the Registry.</b> A URL is assigned by the world, not chosen, so nothing is invented. Keeps the review list small enough that you'll actually work it.</li>
+      <li><b>Provenance is supplied at capture, never inferred.</b> Via the OS share sheet — which makes the mobile app a <em>share target</em>, not a capture app. Missing provenance is marked <code>unresolved</code>, never silently self-attributed.</li>
+      <li><b>Topic synthesis is map-reduce over cached Contributions.</b> LLM work sits at the Note level where it is 1:1 and cacheable; Topic assembly stays mechanical. Without this, the 3am job gets slower every week until it stops finishing.</li>
+      <li><b>Every artifact is either derived or decided.</b> The principle the earlier decisions were circling. The one combination that has no home is decided state inside a derived artifact — which is exactly what a checked-off todo would be.</li>
+      <li><b>Items are proposals; accepting one promotes it to a Task.</b> Reuses the Candidate→Registry pattern instead of a third mechanism. Promotion doubles as triage, and a Task survives replay because decided state is never regenerated.</li>
+      <li><b>Compute is split by workload.</b> Pipeline as a Cloud Run Job; the app ships its read index to the browser and the server only commits decided state. Semantic search lives in the pipeline, so embeddings never reach the client.</li>
+      <li><b>GitHub hosts the Vault.</b> Google has no general-purpose Git host any more — the one deliberate non-Google dependency, and it brings Actions as a fallback runner.</li>
+      <li><b>The Vault is an OKF bundle.</b> Google's Open Knowledge Format is real and permissive — one required key, arbitrary extras preserved. Links become standard markdown rather than wikilinks, which costs nothing because only the pipeline ever writes a link.</li>
+      <li><b>The domain owns frontmatter; the adapter owns the file.</b> Typed rules over the fields that carry them, unknown keys passed through opaquely, the body opaque to the domain. Paths become an adapter concern, which is what makes renaming cheap.</li>
+      <li><b>The system boundary starts at text.</b> The transcript is the Capture, so audio never enters Git and typing is a first-class input rather than a fallback. Whisper runs locally and is vocabulary-biased with the Registry, so the names you use most transcribe correctly.</li>
+      <li><b>The MVP has no app.</b> Obsidian is the whole interface; the review loops are just two files you move a line between. The risk lives in the pipeline, so that is where the first release spends its effort.</li>
+      <li><b>The harness guards determinism, not just correctness.</b> Cassettes make LLM calls testable, evals answer "did it get worse" separately from "did it break", and a golden-corpus replay must be byte-identical.</li>
+      <li><b>Backlinks are computed, and the graph is bipartite.</b> Storing them would make every new Capture rewrite old Notes. No Note→Note links — connection runs through a named Topic, so every edge is explainable. Similarity proposes Candidates instead of guessing edges.</li>
+      <li><b>No contribution graph.</b> A streak counter rewards volume of Captures and would corrupt the corpus it measures. Dormancy — what has gone quiet, what is piling up unreviewed — is the signal worth surfacing.</li>
+      <li><b>No LLM-generated HTML views.</b> Enrichment reads untrusted web content, so generated markup is a path from a hostile page to script execution inside a PWA holding the whole knowledge base and a Git credential.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="lbl">Open<span>Next up</span></div>
+  <div>
+    <ul class="q">
+      <li><b>Next step.</b> Slice 1 — one Capture in Git, through a Cloud Run Job, back as a committed Note.</li>
+    </ul>
+  </div>
+</section>
+
+<p class="foot">Generated from <code>docs/design-overview.html</code> · glossary in <code>CONTEXT.md</code> · full rationale in <code>docs/adr/</code></p>
+</body></html>
