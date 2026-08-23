@@ -18,7 +18,14 @@ class Config:
     def from_environment(cls) -> "Config":
         remote = os.environ.get("VAULT_REMOTE")
         if not remote:
-            raise SystemExit("VAULT_REMOTE is not set")
+            raise SystemExit(
+                "VAULT_REMOTE is not set — it names the Vault repository.\n\n"
+                "  Against your real Vault:\n"
+                "    export VAULT_REMOTE=git@github.com:<owner>/second-brain-vault.git\n\n"
+                "  Against the local stack, after `docker compose up`:\n"
+                "    export VAULT_REMOTE=$PWD/.vault-remote/vault.git\n"
+                "    export VAULT_WORKING_COPY=$PWD/.working-copy/vault"
+            )
         return cls(
             vault_remote=remote,
             working_copy=Path(os.environ.get("VAULT_WORKING_COPY", "/tmp/vault")),

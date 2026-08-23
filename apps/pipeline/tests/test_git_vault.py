@@ -1,6 +1,9 @@
+import shutil
 from pathlib import Path
 
-from pipeline.adapters.git_vault import GitVault
+import pytest
+
+from pipeline.adapters.git_vault import GitError, GitVault
 from pipeline.domain.identity import CaptureId
 from tests.conftest import SEED_CAPTURE, Seed
 
@@ -30,3 +33,22 @@ def test_cloning_twice_refreshes_rather_than_failing(vault_remote: Seed, tmp_pat
 def test_an_empty_vault_has_no_captures(vault_remote: Seed, tmp_path: Path) -> None:
     vault = GitVault.clone(vault_remote({}), tmp_path / "work")
     assert vault.captures() == []
+
+
+def test_realigns_origin_when_the_remote_moves(vault_remote: Seed, tmp_path: Path) -> None:
+    """A working copy cloned in a container is reused from the host, where the
+    container's remote path does not exist."""
+    remote = vault_remote({"2026-08-23T1714": SEED_CAPTURE})
+    working_copy = tmp_path / "work"
+    GitVault.clone(remote, working_copy)
+
+    moved = tmp_path / "moved.git"
+    shutil.move(remote, moved)
+
+    vault = GitVault.clone(str(moved), working_copy)
+    assert vault.captures() == [CaptureId("2026-08-23T1714")]
+
+
+def test_a_git_failure_reports_what_git_said(tmp_path: Path) -> None:
+    with pytest.raises(GitError, match="does-not-exist"):
+        GitVault.clone(str(tmp_path / "does-not-exist.git"), tmp_path / "work")
